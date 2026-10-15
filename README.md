@@ -1,4 +1,4 @@
-# nyanpass backend（免授权自改版）
+# nyanpass backend（免授权版）
 
 nyanpass 后端面板的自定义构建。本仓库包含可直接部署的后端程序、前端文件、IP 数据库和 Docker Compose 配置，不包含任何用户数据。
 
