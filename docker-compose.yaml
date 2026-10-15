@@ -6,7 +6,7 @@ services:
     environment:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
     volumes:
-      - .:/opt/backend
+      - .:/opt/backend:z
     working_dir: /opt/backend
     command:
       - /bin/sh
@@ -30,16 +30,26 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:18888/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
   caddy:
     image: caddy:2-alpine
     network_mode: host
     restart: always
     environment:
       DOMAIN: ${DOMAIN:-panel.example.com}
+    depends_on:
+      nya:
+        condition: service_healthy
     volumes:
-      - .:/opt/backend
-      - ./caddy:/etc/caddy
-      - ./caddy_data:/data
+      - .:/opt/backend:z
+      - ./caddy:/etc/caddy:ro,z
+      - ./caddy_data:/data:z
+      - ./caddy_config:/config:z
     command: caddy run --config /etc/caddy/Caddyfile.example --adapter caddyfile
     logging:
       driver: "json-file"

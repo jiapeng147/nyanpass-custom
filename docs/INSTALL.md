@@ -2,6 +2,40 @@
 
 本文适合不使用 AI、希望逐步完成部署的用户。
 
+## 一键安装支持范围
+
+仓库根目录的 `install.sh` 支持常见的：
+
+- Debian / Ubuntu
+- CentOS / RHEL / Fedora
+- Alpine Linux
+- Arch Linux
+- openSUSE
+
+安装器要求 Linux x86_64，并识别 `apt`、`dnf`、`yum`、`apk`、`pacman` 或 `zypper`。Docker 官方安装脚本主要支持 Debian、Ubuntu、CentOS、RHEL 和 Fedora；Alpine、Arch Linux 与 openSUSE 使用各自的软件包安装 Docker。若系统没有 Compose 插件，安装器会从 Docker Compose 官方 GitHub Release 下载 x86_64 CLI 插件。未知发行版不会盲目修改系统，会停止并要求手动安装依赖。
+
+以下环境不在一键安装支持范围：
+
+- ARM、32 位 Linux、Windows 或 macOS
+- Rootless Docker
+- 禁止 Docker、host 网络或 systemd/OpenRC 服务管理的受限容器环境
+- 无法访问 GitHub、Docker 软件源或镜像仓库的网络环境
+
+安装器不会自动开放防火墙或云安全组，不会修改 DNS，也不会停止已有的 Nginx、Caddy、GoEdge 或其他占用 `80/443` 的服务。检测到端口冲突时，默认仅启动后端。
+
+一键安装：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh | sudo bash
+```
+
+无人值守安装示例：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh \
+  | sudo env DOMAIN=panel.example.com ADMIN_USERNAME=admin DEPLOY_MODE=full bash
+```
+
 ## 1. 准备服务器
 
 服务器需要满足：

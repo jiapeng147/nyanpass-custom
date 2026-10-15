@@ -5,6 +5,7 @@ caddy/Caddyfile
 data.db
 data.db-*
 caddy_data/
+caddy_config/
 *.log
 initial-admin.txt
 你的数据库.db

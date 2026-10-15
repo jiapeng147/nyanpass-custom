@@ -34,6 +34,20 @@ curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/ins
 
 脚本会自动安装 Docker、下载程序、询问域名、初始化数据库并显示管理员密码。如果检测到 `80/443` 已被占用，会仅启动后端并提示现有反向代理的回源地址。
 
+脚本要求 Linux x86_64。Docker 自动安装主要覆盖 Debian、Ubuntu、CentOS、RHEL、Fedora 和 Alpine Linux；Arch Linux 与 openSUSE 使用发行版软件包安装 Docker。若系统没有 Compose 插件，脚本会从 Docker Compose 官方 GitHub Release 安装 x86_64 CLI 插件。其他系统只要已经安装 Docker、Git、curl 和 `ss`，也可以运行脚本。
+
+不支持 ARM、32 位 Linux、Windows、macOS、Rootless Docker，以及禁止 Docker/host 网络的受限容器或虚拟化环境。脚本不会修改防火墙、安全组、DNS 或现有反向代理；检测到 `80/443` 已占用时默认切换为仅后端模式，不会停止占用端口的服务。
+
+可通过环境变量强制选择部署模式：
+
+```bash
+# 使用内置 Caddy，占用 80/443
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh | sudo env DEPLOY_MODE=full DOMAIN=panel.example.com bash
+
+# 只启动后端，交给已有反向代理或 CDN
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh | sudo env DEPLOY_MODE=backend bash
+```
+
 完整的逐步教程见 [`docs/INSTALL.md`](docs/INSTALL.md)。
 
 ## 手动快速部署
@@ -90,6 +104,7 @@ docker compose up -d
 - Caddy 使用 host 网络访问后端，并自动申请和续期 HTTPS 证书。
 - 域名在 `.env` 的 `DOMAIN` 中配置。
 - 管理员用户名可通过 `.env` 的 `ADMIN_USERNAME` 修改，默认是 `admin`。
+- 部署模式保存在 `.env` 的 `DEPLOY_MODE`，可选 `full`、`backend` 或首次安装时使用 `auto` 自动判断。
 - `config.yml` 的 `key` 保持为空，无需填写授权码。
 - 如果服务器的 `80/443` 已被 Nginx、Caddy、GoEdge 或其他程序占用，请不要启动 Compose 中的 `caddy` 服务，改用现有反向代理转发到 `127.0.0.1:18888`。
 
