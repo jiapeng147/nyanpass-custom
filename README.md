@@ -26,6 +26,18 @@ nyanpass 后端面板的自定义构建。本仓库包含可直接部署的后�
 
 ## 一键部署
 
+不熟悉 Linux 的用户可以直接执行交互式安装脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh | sudo bash
+```
+
+脚本会自动安装 Docker、下载程序、询问域名、初始化数据库并显示管理员密码。如果检测到 `80/443` 已被占用，会仅启动后端并提示现有反向代理的回源地址。
+
+完整的逐步教程见 [`docs/INSTALL.md`](docs/INSTALL.md)。
+
+## 手动快速部署
+
 ```bash
 git clone https://github.com/jiapeng147/nyanpass-custom.git /opt/nyanpass
 cd /opt/nyanpass
