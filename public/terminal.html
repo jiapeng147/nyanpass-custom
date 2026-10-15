@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>终端</title>
+    <link href="https://testingcf.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" type="text/css" rel="stylesheet">
+    <script src="https://testingcf.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://testingcf.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+    <style>
+        :root {
+            --app-height: 100dvh;
+            --app-top: 0px;
+            color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overscroll-behavior: none;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        #terminal-app {
+            position: fixed;
+            top: var(--app-top);
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: var(--app-height);
+            overflow: hidden;
+            background: #000;
+        }
+
+        #terminal-container {
+            position: relative;
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 0;
+            padding: 2px 3px 0;
+            overflow: hidden;
+        }
+
+        #terminal-container .xterm {
+            height: 100%;
+        }
+
+        /* 只有进入“选择”模式时才接管触摸拖动；平时不影响 xterm 的输入与滚动。 */
+        body.selection-mode #terminal-container,
+        body.selection-mode #terminal-container * {
+            cursor: crosshair !important;
+            touch-action: none !important;
+        }
+
+        #extra-keys {
+            flex: 0 0 auto;
+            width: 100%;
+            padding:
+                4px max(4px, env(safe-area-inset-right)) calc(5px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+            border-top: 1px solid #292929;
+            background: #111;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            min-height: 30px;
+            margin-bottom: 3px;
+        }
+
+        .toolbar-action {
+            appearance: none;
+            min-height: 29px;
+            padding: 0 12px;
+            border: 1px solid #393939;
+            border-radius: 5px;
+            background: #202020;
+            color: #eee;
+            font-size: 12px;
+            font-weight: 600;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .toolbar-action:active {
+            background: #3a3a3a;
+        }
+
+        .toolbar-action[aria-pressed="true"] {
+            border-color: #8ab4f8;
+            background: #d8e7ff;
+            color: #111;
+        }
+
+        #toolbar-status {
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+            color: #a8a8a8;
+            font-size: 11px;
+            text-align: right;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #key-grid {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(0, 1fr));
+            gap: 3px;
+        }
+
+        .extra-key {
+            appearance: none;
+            min-width: 0;
+            height: 39px;
+            margin: 0;
+            padding: 0 2px;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            color: #f2f2f2;
+            font: 600 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            text-align: center;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+
+        .extra-key.symbol {
+            font-size: 19px;
+            font-weight: 500;
+        }
+
+        .extra-key:active,
+        .extra-key.is-pressed {
+            background: #343434;
+        }
+
+        .extra-key.modifier[aria-pressed="true"] {
+            background: #e8e8e8;
+            color: #111;
+        }
+
+        .extra-key:focus-visible,
+        .toolbar-action:focus-visible,
+        #toolbar-toggle:focus-visible {
+            outline: 2px solid #a8c7fa;
+            outline-offset: -2px;
+        }
+
+        /* 工具栏隐藏后仍保留一个可呼出的按钮，桌面端默认就是这个状态。 */
+        #toolbar-toggle {
+            position: fixed;
+            z-index: 20;
+            right: max(10px, env(safe-area-inset-right));
+            bottom: max(10px, env(safe-area-inset-bottom));
+            min-width: 54px;
+            height: 38px;
+            padding: 0 11px;
+            border: 1px solid #4a4a4a;
+            border-radius: 19px;
+            background: rgba(28, 28, 28, 0.92);
+            color: #f1f1f1;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+            font-size: 12px;
+            font-weight: 700;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        #toolbar-toggle:active {
+            background: #444;
+        }
+
+        #toast {
+            position: fixed;
+            z-index: 30;
+            left: 50%;
+            bottom: calc(16px + env(safe-area-inset-bottom));
+            max-width: min(88vw, 520px);
+            padding: 8px 13px;
+            border: 1px solid #444;
+            border-radius: 7px;
+            background: rgba(35, 35, 35, 0.96);
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+
+        /*
+         * xterm.js 的画布区域在手机上无法依赖系统原生的文字菜单。
+         * 粗指针设备关闭 WebKit 的“自动填充”长按菜单，改由下面的自定义菜单处理。
+         */
+        @media (pointer: coarse) {
+
+            #terminal-container,
+            #terminal-container .xterm,
+            #terminal-container .xterm-screen,
+            #terminal-container canvas,
+            #terminal-container * {
+                -webkit-touch-callout: none;
+            }
+        }
+
+        #touch-context-menu {
+            position: fixed;
+            z-index: 60;
+            display: flex;
+            gap: 2px;
+            max-width: calc(100vw - 16px);
+            padding: 5px;
+            border: 1px solid #505050;
+            border-radius: 9px;
+            background: rgba(35, 35, 35, 0.98);
+            box-shadow: 0 7px 24px rgba(0, 0, 0, 0.58);
+            transform: translate(-50%, calc(-100% - 12px));
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #touch-context-menu[data-placement="below"] {
+            transform: translate(-50%, 12px);
+        }
+
+        .context-action {
+            appearance: none;
+            min-width: 55px;
+            height: 38px;
+            padding: 0 12px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: #f2f2f2;
+            font-size: 13px;
+            font-weight: 650;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .context-action:active {
+            background: #505050;
+        }
+
+        .context-action:disabled {
+            color: #777;
+        }
+
+        #paste-dialog-backdrop {
+            position: fixed;
+            z-index: 70;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.62);
+        }
+
+        #paste-dialog {
+            width: min(92vw, 520px);
+            padding: 15px;
+            border: 1px solid #525252;
+            border-radius: 11px;
+            background: #1b1b1b;
+            box-shadow: 0 10px 34px rgba(0, 0, 0, 0.65);
+        }
+
+        #paste-dialog-title {
+            margin: 0 0 7px;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        #paste-dialog-help {
+            margin: 0 0 10px;
+            color: #bbb;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        #paste-input {
+            display: block;
+            width: 100%;
+            min-height: 96px;
+            max-height: 38vh;
+            resize: vertical;
+            padding: 10px;
+            border: 1px solid #565656;
+            border-radius: 7px;
+            outline: none;
+            background: #090909;
+            color: #f4f4f4;
+            font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            caret-color: #fff;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        #paste-input:focus {
+            border-color: #8ab4f8;
+        }
+
+        #paste-dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .dialog-action {
+            appearance: none;
+            min-width: 72px;
+            height: 36px;
+            padding: 0 14px;
+            border: 1px solid #4c4c4c;
+            border-radius: 7px;
+            background: #292929;
+            color: #f3f3f3;
+            font-size: 13px;
+            font-weight: 650;
+            touch-action: manipulation;
+        }
+
+        .dialog-action.primary {
+            border-color: #8ab4f8;
+            background: #d8e7ff;
+            color: #111;
+        }
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            #toolbar-actions {
+                min-height: 26px;
+                margin-bottom: 2px;
+            }
+
+            .toolbar-action {
+                min-height: 25px;
+                padding: 0 9px;
+            }
+
+            #key-grid {
+                gap: 2px;
+            }
+
+            .extra-key {
+                height: 31px;
+                font-size: 12px;
+            }
+
+            .extra-key.symbol {
+                font-size: 17px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main id="terminal-app">
+        <div id="terminal-container" aria-label="终端区域"></div>
+
+        <nav id="extra-keys" aria-label="终端扩展按键" hidden>
+            <div id="toolbar-actions">
+                <button id="select-button" class="toolbar-action" type="button" aria-pressed="false">选择</button>
+                <button id="copy-button" class="toolbar-action" type="button">复制</button>
+                <button id="paste-button" class="toolbar-action" type="button">粘贴</button>
+                <button id="clear-selection-button" class="toolbar-action" type="button">取消选择</button>
+                <span id="toolbar-status">长按终端可选择/复制/粘贴</span>
+                <button id="hide-toolbar-button" class="toolbar-action" type="button">隐藏</button>
+            </div>
+
+            <div id="key-grid">
+                <button class="extra-key" type="button" data-key="esc" aria-label="Escape">ESC</button>
+                <button class="extra-key symbol" type="button" data-key="equal" aria-label="等号">=</button>
+                <button class="extra-key symbol" type="button" data-key="slash" aria-label="斜杠">/</button>
+                <button class="extra-key" type="button" data-key="home">HOME</button>
+                <button class="extra-key symbol" type="button" data-key="up" aria-label="上方向键">↑</button>
+                <button class="extra-key" type="button" data-key="end">END</button>
+                <button class="extra-key" type="button" data-key="pgup">PGUP</button>
+                <button class="extra-key symbol" type="button" data-key="del" aria-label="Delete">⌦</button>
+
+                <button class="extra-key symbol" type="button" data-key="tab" aria-label="Tab">↹</button>
+                <button class="extra-key modifier" type="button" data-modifier="ctrl" aria-pressed="false">CTRL</button>
+                <button class="extra-key modifier" type="button" data-modifier="alt" aria-pressed="false">ALT</button>
+                <button class="extra-key symbol" type="button" data-key="left" aria-label="左方向键">←</button>
+                <button class="extra-key symbol" type="button" data-key="down" aria-label="下方向键">↓</button>
+                <button class="extra-key symbol" type="button" data-key="right" aria-label="右方向键">→</button>
+                <button class="extra-key" type="button" data-key="pgdn">PGDN</button>
+                <button class="extra-key symbol" type="button" data-key="bksp" aria-label="Backspace">⌫</button>
+            </div>
+        </nav>
+    </main>
+
+    <button id="toolbar-toggle" type="button" title="显示扩展按键（Ctrl/⌘+Shift+K）">⌨ 按键</button>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+
+    <div id="touch-context-menu" role="menu" aria-label="终端操作" hidden>
+        <button class="context-action" type="button" data-context-action="select">选择</button>
+        <button class="context-action" type="button" data-context-action="copy">复制</button>
+        <button class="context-action" type="button" data-context-action="paste">粘贴</button>
+        <button class="context-action" type="button" data-context-action="cancel">取消</button>
+    </div>
+
+    <div id="paste-dialog-backdrop" hidden>
+        <section id="paste-dialog" role="dialog" aria-modal="true" aria-labelledby="paste-dialog-title">
+            <h2 id="paste-dialog-title">粘贴到终端</h2>
+            <p id="paste-dialog-help">浏览器没有允许直接读取剪贴板。请在下面输入框中长按，选择系统的“粘贴”，然后点“发送”。</p>
+            <textarea id="paste-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                enterkeyhint="done" aria-label="粘贴内容"></textarea>
+            <div id="paste-dialog-actions">
+                <button id="paste-cancel-button" class="dialog-action" type="button">取消</button>
+                <button id="paste-send-button" class="dialog-action primary" type="button">发送</button>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        "use strict";
+
+        const hashs = window.location.hash.split("#");
+
+        if (hashs.length < 2 || !hashs[1]) {
+            alert("网页参数有误");
+            throw new Error("缺少 terminal sessionId");
+        }
+
+        document.title = hashs.length >= 3 ? "终端@" + hashs[2] : "终端";
+
+        const sessionId = hashs[1];
+        let wsurl = "wss://" + window.location.host
+            + "/api/v1/system/node/terminal_ws/" + sessionId
+            + "?token=" + localStorage.getItem("Authorization");
+
+        if (sessionId.includes("://")) {
+            wsurl = sessionId;
+        }
+
+        const terminalContainer = document.getElementById("terminal-container");
+        const extraKeys = document.getElementById("extra-keys");
+        const toolbarToggle = document.getElementById("toolbar-toggle");
+        const hideToolbarButton = document.getElementById("hide-toolbar-button");
+        const selectButton = document.getElementById("select-button");
+        const copyButton = document.getElementById("copy-button");
+        const pasteButton = document.getElementById("paste-button");
+        const clearSelectionButton = document.getElementById("clear-selection-button");
+        const toolbarStatus = document.getElementById("toolbar-status");
+        const toast = document.getElementById("toast");
+        const touchContextMenu = document.getElementById("touch-context-menu");
+        const contextCopyButton = touchContextMenu.querySelector('[data-context-action="copy"]');
+        const pasteDialogBackdrop = document.getElementById("paste-dialog-backdrop");
+        const pasteInput = document.getElementById("paste-input");
+        const pasteCancelButton = document.getElementById("paste-cancel-button");
+        const pasteSendButton = document.getElementById("paste-send-button");
+
+        const term = new Terminal({
+            cursorBlink: true,
+            scrollback: 5000,
+            convertEol: false,
+            rightClickSelectsWord: true,
+            theme: {
+                background: "#000000",
+                selectionBackground: "rgba(90, 150, 255, 0.55)",
+                selectionInactiveBackground: "rgba(90, 150, 255, 0.38)"
+            }
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(terminalContainer);
+
+        /* 减少移动浏览器/密码管理器把 xterm 的隐藏 textarea 识别成表单字段。 */
+        const xtermTextarea = terminalContainer.querySelector(".xterm-helper-textarea");
+        if (xtermTextarea) {
+            xtermTextarea.setAttribute("autocomplete", "off");
+            xtermTextarea.setAttribute("autocorrect", "off");
+            xtermTextarea.setAttribute("autocapitalize", "off");
+            xtermTextarea.setAttribute("spellcheck", "false");
+            xtermTextarea.setAttribute("data-lpignore", "true");
+            xtermTextarea.setAttribute("data-1p-ignore", "true");
+            xtermTextarea.setAttribute("aria-label", "终端输入");
+        }
+
+        const socket = new WebSocket(wsurl);
+        socket.binaryType = "arraybuffer";
+
+        socket.addEventListener("message", async (event) => {
+            if (typeof event.data === "string") {
+                term.write(event.data);
+            } else if (event.data instanceof ArrayBuffer) {
+                term.write(new Uint8Array(event.data));
+            } else if (event.data instanceof Blob) {
+                term.write(new Uint8Array(await event.data.arrayBuffer()));
+            }
+        });
+
+        socket.addEventListener("open", () => {
+            syncViewport();
+            scheduleResize(0);
+            term.focus();
+        });
+
+        socket.addEventListener("close", () => {
+            alert("Terminal 连接超时或会话已结束");
+            window.close();
+        });
+
+        socket.addEventListener("error", () => {
+            alert("Terminal 连接失败，请检查 /terminal/* 的 WebSocket 反代情况");
+        });
+
+        let toastTimer = 0;
+
+        function showToast(message, duration = 1600) {
+            window.clearTimeout(toastTimer);
+            toast.textContent = message;
+            toast.hidden = false;
+            toastTimer = window.setTimeout(() => {
+                toast.hidden = true;
+            }, duration);
+        }
+
+        const modifierState = {
+            ctrl: false,
+            alt: false
+        };
+
+        const modifierButtons = {
+            ctrl: document.querySelector('[data-modifier="ctrl"]'),
+            alt: document.querySelector('[data-modifier="alt"]')
+        };
+
+        function updateModifierButtons() {
+            for (const name of Object.keys(modifierButtons)) {
+                modifierButtons[name].setAttribute("aria-pressed", String(modifierState[name]));
+            }
+        }
+
+        function toggleModifier(name) {
+            modifierState[name] = !modifierState[name];
+            updateModifierButtons();
+        }
+
+        function consumeModifiers() {
+            const current = {
+                ctrl: modifierState.ctrl,
+                alt: modifierState.alt
+            };
+
+            modifierState.ctrl = false;
+            modifierState.alt = false;
+            updateModifierButtons();
+            return current;
+        }
+
+        function modifierCode(modifiers) {
+            if (modifiers.ctrl && modifiers.alt) return 7;
+            if (modifiers.ctrl) return 5;
+            if (modifiers.alt) return 3;
+            return 1;
+        }
+
+        function ctrlCharacter(character) {
+            if (!character) return character;
+            if (character === " ") return "\x00";
+            if (character === "?") return "\x7f";
+
+            const upper = character.toUpperCase();
+            const code = upper.charCodeAt(0);
+
+            if (code >= 64 && code <= 95) {
+                return String.fromCharCode(code - 64);
+            }
+
+            return character;
+        }
+
+        function applyTextModifiers(data, modifiers) {
+            if (!modifiers.ctrl && !modifiers.alt) return data;
+
+            let output = data;
+
+            if (modifiers.ctrl && output.length > 0) {
+                output = ctrlCharacter(output[0]) + output.slice(1);
+            }
+
+            if (modifiers.alt) {
+                output = "\x1b" + output;
+            }
+
+            return output;
+        }
+
+        function applyModifiersToSequence(sequence, modifiers) {
+            if (!modifiers.ctrl && !modifiers.alt) return sequence;
+
+            const code = modifierCode(modifiers);
+            const finalCharMatch = sequence.match(/^\x1b\[([ABCDHF])$/);
+            if (finalCharMatch) {
+                return "\x1b[1;" + code + finalCharMatch[1];
+            }
+
+            const tildeMatch = sequence.match(/^\x1b\[(\d+)~$/);
+            if (tildeMatch) {
+                return "\x1b[" + tildeMatch[1] + ";" + code + "~";
+            }
+
+            return applyTextModifiers(sequence, modifiers);
+        }
+
+        function sendToSocket(data) {
+            if (socket.readyState !== WebSocket.OPEN) {
+                showToast("终端尚未连接");
+                return false;
+            }
+
+            socket.send(data);
+            return true;
+        }
+
+        /* 普通软键盘/硬键盘输入仍由 xterm 的 onData 转发。 */
+        term.onData((data) => {
+            sendToSocket(applyModifiersToSequence(data, consumeModifiers()));
+        });
+
+        term.onBinary((data) => {
+            const bytes = new Uint8Array(data.length);
+            for (let i = 0; i < data.length; i += 1) {
+                bytes[i] = data.charCodeAt(i) & 0xff;
+            }
+            sendToSocket(bytes);
+        });
+
+        const keySequences = {
+            esc: "\x1b",
+            equal: "=",
+            slash: "/",
+            home: "\x1b[H",
+            up: "\x1b[A",
+            end: "\x1b[F",
+            pgup: "\x1b[5~",
+            del: "\x1b[3~",
+            tab: "\t",
+            left: "\x1b[D",
+            down: "\x1b[B",
+            right: "\x1b[C",
+            pgdn: "\x1b[6~",
+            bksp: "\x7f"
+        };
+
+        const repeatableKeys = new Set(["left", "right", "up", "down", "pgup", "pgdn", "del", "bksp"]);
+        let repeatDelayTimer = 0;
+        let repeatTimer = 0;
+
+        function stopRepeating() {
+            window.clearTimeout(repeatDelayTimer);
+            window.clearInterval(repeatTimer);
+            repeatDelayTimer = 0;
+            repeatTimer = 0;
+            document.querySelectorAll(".extra-key.is-pressed").forEach((button) => {
+                button.classList.remove("is-pressed");
+            });
+        }
+
+        /*
+         * xterm 5.3.0 没有公开的 Terminal.input() API，所以扩展按键必须直接写入
+         * WebSocket。之前调用 term.input() 会抛 TypeError，导致所有按钮无反应。
+         */
+        function sendExtraKey(key, useModifiers = true) {
+            const sequence = keySequences[key];
+            if (!sequence) return false;
+
+            const modifiers = useModifiers ? consumeModifiers() : { ctrl: false, alt: false };
+            const output = applyModifiersToSequence(sequence, modifiers);
+
+            if (!sendToSocket(output)) return false;
+
+            term.clearSelection();
+            term.scrollToBottom();
+            term.focus();
+            return true;
+        }
+
+        function startRepeating(button, key) {
+            stopRepeating();
+            button.classList.add("is-pressed");
+            sendExtraKey(key, true);
+
+            if (!repeatableKeys.has(key)) return;
+
+            repeatDelayTimer = window.setTimeout(() => {
+                repeatTimer = window.setInterval(() => {
+                    sendExtraKey(key, false);
+                }, 75);
+            }, 380);
+        }
+
+        const keyGrid = document.getElementById("key-grid");
+
+        keyGrid.addEventListener("pointerdown", (event) => {
+            const button = event.target.closest("button");
+            if (!button) return;
+
+            event.preventDefault();
+            button.setPointerCapture?.(event.pointerId);
+
+            const modifier = button.dataset.modifier;
+            if (modifier) {
+                stopRepeating();
+                toggleModifier(modifier);
+                term.focus();
+                return;
+            }
+
+            startRepeating(button, button.dataset.key);
+        });
+
+        keyGrid.addEventListener("pointerup", stopRepeating);
+        keyGrid.addEventListener("pointercancel", stopRepeating);
+        keyGrid.addEventListener("lostpointercapture", stopRepeating);
+        window.addEventListener("blur", stopRepeating);
+
+        /* 键盘操作按钮时，click.detail 为 0。 */
+        keyGrid.addEventListener("click", (event) => {
+            if (event.detail !== 0) return;
+
+            const button = event.target.closest("button");
+            if (!button) return;
+
+            if (button.dataset.modifier) {
+                toggleModifier(button.dataset.modifier);
+                term.focus();
+            } else {
+                sendExtraKey(button.dataset.key, true);
+            }
+        });
+
+        /* ------------------------- 工具栏显示/隐藏 ------------------------- */
+
+        const toolbarStorageKey = "terminal.extraKeys.visible";
+
+        function setToolbarVisible(visible, remember = true) {
+            extraKeys.hidden = !visible;
+            toolbarToggle.hidden = visible;
+
+            if (!visible) {
+                setSelectionMode(false, false);
+                closeTouchContextMenu();
+                if (!pasteDialogBackdrop.hidden) closePasteDialog(false);
+            }
+
+            if (remember) {
+                try {
+                    localStorage.setItem(toolbarStorageKey, visible ? "1" : "0");
+                } catch (error) {
+                    console.debug("无法保存工具栏状态", error);
+                }
+            }
+
+            syncViewport();
+            scheduleResize(0);
+        }
+
+        function getInitialToolbarVisibility() {
+            try {
+                const stored = localStorage.getItem(toolbarStorageKey);
+                if (stored === "1") return true;
+                if (stored === "0") return false;
+            } catch (error) {
+                console.debug("无法读取工具栏状态", error);
+            }
+
+            return window.matchMedia("(max-width: 900px), (pointer: coarse)").matches;
+        }
+
+        toolbarToggle.addEventListener("click", () => setToolbarVisible(true));
+        hideToolbarButton.addEventListener("click", () => setToolbarVisible(false));
+
+        document.addEventListener("keydown", (event) => {
+            const isToggleShortcut = (event.ctrlKey || event.metaKey)
+                && event.shiftKey
+                && event.key.toLowerCase() === "k";
+
+            if (!isToggleShortcut) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            setToolbarVisible(extraKeys.hidden);
+        }, true);
+
+
+        /* ------------------------- 移动端长按菜单与粘贴 ------------------------- */
+
+        function isCoarsePointer(event) {
+            if (event?.pointerType) {
+                return event.pointerType === "touch" || event.pointerType === "pen";
+            }
+            return window.matchMedia("(pointer: coarse)").matches;
+        }
+
+        function closeTouchContextMenu() {
+            touchContextMenu.hidden = true;
+        }
+
+        function showTouchContextMenu(clientX, clientY) {
+            contextCopyButton.disabled = !term.hasSelection();
+            touchContextMenu.hidden = false;
+            touchContextMenu.dataset.placement = clientY < 92 ? "below" : "above";
+
+            const viewportWidth = window.visualViewport?.width || window.innerWidth;
+            const margin = 8;
+            const halfWidth = Math.max(110, touchContextMenu.offsetWidth / 2);
+            const x = Math.min(
+                Math.max(clientX, margin + halfWidth),
+                viewportWidth - margin - halfWidth
+            );
+
+            touchContextMenu.style.left = x + "px";
+            touchContextMenu.style.top = clientY + "px";
+            term.textarea?.blur();
+        }
+
+        let longPressTimer = 0;
+        let longPressPointerId = null;
+        let longPressStartX = 0;
+        let longPressStartY = 0;
+        let longPressTriggered = false;
+
+        function cancelLongPress() {
+            window.clearTimeout(longPressTimer);
+            longPressTimer = 0;
+            longPressPointerId = null;
+        }
+
+        terminalContainer.addEventListener("pointerdown", (event) => {
+            if (!isCoarsePointer(event) || selectionMode || event.button > 0) return;
+
+            closeTouchContextMenu();
+            cancelLongPress();
+            longPressPointerId = event.pointerId;
+            longPressStartX = event.clientX;
+            longPressStartY = event.clientY;
+            longPressTriggered = false;
+
+            longPressTimer = window.setTimeout(() => {
+                if (longPressPointerId !== event.pointerId) return;
+                longPressTriggered = true;
+                navigator.vibrate?.(18);
+                showTouchContextMenu(longPressStartX, longPressStartY);
+            }, 460);
+        }, true);
+
+        terminalContainer.addEventListener("pointermove", (event) => {
+            if (longPressPointerId !== event.pointerId) return;
+
+            const distance = Math.hypot(
+                event.clientX - longPressStartX,
+                event.clientY - longPressStartY
+            );
+
+            if (distance > 12) cancelLongPress();
+        }, true);
+
+        function finishLongPress(event) {
+            if (longPressPointerId !== event.pointerId) return;
+            const wasTriggered = longPressTriggered;
+            cancelLongPress();
+
+            if (wasTriggered) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }
+
+        terminalContainer.addEventListener("pointerup", finishLongPress, true);
+        terminalContainer.addEventListener("pointercancel", finishLongPress, true);
+
+        /* iOS/部分 Android 浏览器仍可能触发 contextmenu，用自定义菜单替代“自动填充”。 */
+        terminalContainer.addEventListener("contextmenu", (event) => {
+            if (!isCoarsePointer(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            cancelLongPress();
+            showTouchContextMenu(event.clientX, event.clientY);
+        }, true);
+
+        function pasteIntoTerminal(text) {
+            if (!text) {
+                showToast("没有可粘贴的文本");
+                return false;
+            }
+
+            if (socket.readyState !== WebSocket.OPEN) {
+                showToast("终端尚未连接");
+                return false;
+            }
+
+            modifierState.ctrl = false;
+            modifierState.alt = false;
+            updateModifierButtons();
+
+            if (typeof term.paste === "function") {
+                term.paste(text);
+            } else {
+                sendToSocket(text);
+            }
+
+            term.clearSelection();
+            setSelectionMode(false, false);
+            term.scrollToBottom();
+            term.focus();
+            showToast("已粘贴到终端");
+            return true;
+        }
+
+        function openPasteDialog() {
+            closeTouchContextMenu();
+            pasteInput.value = "";
+            pasteDialogBackdrop.hidden = false;
+            window.setTimeout(() => {
+                pasteInput.focus({ preventScroll: true });
+            }, 30);
+        }
+
+        function closePasteDialog(refocus = true) {
+            pasteDialogBackdrop.hidden = true;
+            pasteInput.value = "";
+            if (refocus) term.focus();
+        }
+
+        async function pasteFromClipboard() {
+            closeTouchContextMenu();
+
+            if (navigator.clipboard?.readText && window.isSecureContext) {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) {
+                        pasteIntoTerminal(text);
+                        return true;
+                    }
+                } catch (error) {
+                    console.debug("无法直接读取剪贴板，使用手动粘贴输入框", error);
+                }
+            }
+
+            openPasteDialog();
+            return false;
+        }
+
+        pasteButton.addEventListener("click", () => {
+            void pasteFromClipboard();
+        });
+
+        pasteCancelButton.addEventListener("click", () => closePasteDialog());
+        pasteSendButton.addEventListener("click", () => {
+            const text = pasteInput.value;
+            if (pasteIntoTerminal(text)) closePasteDialog(false);
+        });
+
+        pasteDialogBackdrop.addEventListener("pointerdown", (event) => {
+            if (event.target === pasteDialogBackdrop) closePasteDialog();
+        });
+
+        pasteInput.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closePasteDialog();
+            }
+        });
+
+        /* 有 clipboardData 时直接接收系统“粘贴”，否则保留文本让用户点发送。 */
+        pasteInput.addEventListener("paste", (event) => {
+            const text = event.clipboardData?.getData("text/plain") || "";
+            if (!text) return;
+            event.preventDefault();
+            if (pasteIntoTerminal(text)) closePasteDialog(false);
+        });
+
+        touchContextMenu.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-context-action]");
+            if (!button) return;
+
+            const action = button.dataset.contextAction;
+            if (action === "select") {
+                closeTouchContextMenu();
+                term.clearSelection();
+                setSelectionMode(true);
+            } else if (action === "copy") {
+                closeTouchContextMenu();
+                void copyTerminalSelection();
+            } else if (action === "paste") {
+                void pasteFromClipboard();
+            } else {
+                closeTouchContextMenu();
+                term.focus();
+            }
+        });
+
+        document.addEventListener("pointerdown", (event) => {
+            if (touchContextMenu.hidden) return;
+            if (touchContextMenu.contains(event.target)) return;
+            closeTouchContextMenu();
+        }, true);
+
+        /* ------------------------- 手机触摸选择与复制 ------------------------- */
+
+        let selectionMode = false;
+        let selectionPointerId = null;
+        let selectionAnchor = null;
+
+        function setSelectionMode(enabled, notify = true) {
+            selectionMode = enabled;
+            selectionPointerId = null;
+            selectionAnchor = null;
+            document.body.classList.toggle("selection-mode", enabled);
+            selectButton.setAttribute("aria-pressed", String(enabled));
+            selectButton.textContent = enabled ? "选择中" : "选择";
+
+            if (enabled) {
+                term.textarea?.blur();
+                toolbarStatus.textContent = "在终端文字上拖动，完成后点“复制”";
+                if (notify) showToast("选择模式：在终端上拖动");
+            } else {
+                toolbarStatus.textContent = term.hasSelection()
+                    ? "已选中文字，可点“复制”"
+                    : "长按终端可选择/复制/粘贴";
+            }
+        }
+
+        function pointToBufferCell(clientX, clientY) {
+            const screen = term.screenElement || terminalContainer.querySelector(".xterm-screen");
+            if (!screen || !term.cols || !term.rows) return null;
+
+            const rect = screen.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return null;
+
+            const relativeX = Math.min(Math.max(clientX - rect.left, 0), Math.max(0, rect.width - 0.01));
+            const relativeY = Math.min(Math.max(clientY - rect.top, 0), Math.max(0, rect.height - 0.01));
+            const column = Math.min(term.cols - 1, Math.max(0, Math.floor(relativeX / rect.width * term.cols)));
+            const viewportRow = Math.min(term.rows - 1, Math.max(0, Math.floor(relativeY / rect.height * term.rows)));
+            const row = term.buffer.active.viewportY + viewportRow;
+
+            return { column, row };
+        }
+
+        function updateTouchSelection(anchor, current) {
+            if (!anchor || !current) return;
+
+            const anchorIndex = anchor.row * term.cols + anchor.column;
+            const currentIndex = current.row * term.cols + current.column;
+            const start = anchorIndex <= currentIndex ? anchor : current;
+            const endIndex = Math.max(anchorIndex, currentIndex);
+            const startIndex = Math.min(anchorIndex, currentIndex);
+            const length = Math.max(1, endIndex - startIndex + 1);
+
+            term.select(start.column, start.row, length);
+        }
+
+        terminalContainer.addEventListener("pointerdown", (event) => {
+            if (!selectionMode || event.button > 0) return;
+
+            const cell = pointToBufferCell(event.clientX, event.clientY);
+            if (!cell) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            selectionPointerId = event.pointerId;
+            selectionAnchor = cell;
+            terminalContainer.setPointerCapture?.(event.pointerId);
+            updateTouchSelection(selectionAnchor, cell);
+        }, true);
+
+        terminalContainer.addEventListener("pointermove", (event) => {
+            if (!selectionMode || selectionPointerId !== event.pointerId || !selectionAnchor) return;
+
+            const cell = pointToBufferCell(event.clientX, event.clientY);
+            if (!cell) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            updateTouchSelection(selectionAnchor, cell);
+        }, true);
+
+        function finishTouchSelection(event) {
+            if (selectionPointerId !== event.pointerId) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            terminalContainer.releasePointerCapture?.(event.pointerId);
+            selectionPointerId = null;
+            selectionAnchor = null;
+
+            const selected = term.getSelection();
+            if (selected) {
+                toolbarStatus.textContent = "已选中 " + selected.length + " 个字符，点“复制”";
+                showToast("已选中，点“复制”写入剪贴板");
+            } else {
+                toolbarStatus.textContent = "没有选中文字，请重新拖动";
+            }
+        }
+
+        terminalContainer.addEventListener("pointerup", finishTouchSelection, true);
+        terminalContainer.addEventListener("pointercancel", finishTouchSelection, true);
+
+        async function writeClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (error) {
+                    console.debug("Clipboard API 失败，尝试兼容方案", error);
+                }
+            }
+
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            textarea.style.top = "0";
+            document.body.appendChild(textarea);
+            textarea.focus({ preventScroll: true });
+            textarea.select();
+
+            let copied = false;
+            try {
+                copied = document.execCommand("copy");
+            } finally {
+                textarea.remove();
+            }
+            return copied;
+        }
+
+        async function copyTerminalSelection() {
+            const selected = term.getSelection();
+            if (!selected) {
+                showToast("请先点“选择”，再在终端上拖动");
+                return false;
+            }
+
+            const copied = await writeClipboard(selected);
+            if (copied) {
+                setSelectionMode(false, false);
+                toolbarStatus.textContent = "已复制 " + selected.length + " 个字符";
+                showToast("已复制到剪贴板");
+                return true;
+            }
+
+            showToast("浏览器拒绝访问剪贴板，请检查站点权限", 2600);
+            return false;
+        }
+
+        selectButton.addEventListener("click", () => {
+            setSelectionMode(!selectionMode);
+        });
+
+        copyButton.addEventListener("click", () => {
+            void copyTerminalSelection();
+        });
+
+        clearSelectionButton.addEventListener("click", () => {
+            term.clearSelection();
+            setSelectionMode(false, false);
+            toolbarStatus.textContent = "已取消选择";
+        });
+
+        /* 桌面端保留 xterm 原生鼠标选择，并增加常见的终端复制快捷键。 */
+        term.attachCustomKeyEventHandler((event) => {
+            const isCopyShortcut = event.type === "keydown"
+                && (event.ctrlKey || event.metaKey)
+                && event.shiftKey
+                && event.key.toLowerCase() === "c";
+
+            if (isCopyShortcut && term.hasSelection()) {
+                event.preventDefault();
+                void copyTerminalSelection();
+                return false;
+            }
+
+            return true;
+        });
+
+        /* ------------------------- 尺寸同步 ------------------------- */
+
+        let resizeTimer = 0;
+
+        function doResize() {
+            if (!terminalContainer.clientWidth || !terminalContainer.clientHeight) return;
+
+            fitAddon.fit();
+            const dimensions = fitAddon.proposeDimensions();
+
+            if (!dimensions || socket.readyState !== WebSocket.OPEN) return;
+
+            const prefix = new Uint8Array([1]);
+            const resizeMessage = new TextEncoder().encode(JSON.stringify({
+                Rows: dimensions.rows,
+                Cols: dimensions.cols
+            }));
+
+            const message = new Uint8Array(prefix.length + resizeMessage.length);
+            message.set(prefix);
+            message.set(resizeMessage, prefix.length);
+            socket.send(message);
+        }
+
+        function scheduleResize(delay = 120) {
+            window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+                try {
+                    doResize();
+                } catch (error) {
+                    console.error("resize", error);
+                }
+            }, delay);
+        }
+
+        function syncViewport() {
+            const viewport = window.visualViewport;
+            const height = viewport?.height || window.innerHeight;
+            const top = viewport?.offsetTop || 0;
+
+            document.documentElement.style.setProperty("--app-height", height + "px");
+            document.documentElement.style.setProperty("--app-top", top + "px");
+            scheduleResize();
+        }
+
+        window.addEventListener("resize", syncViewport);
+        window.addEventListener("orientationchange", () => {
+            window.setTimeout(syncViewport, 100);
+        });
+        window.visualViewport?.addEventListener("resize", syncViewport);
+        window.visualViewport?.addEventListener("scroll", syncViewport);
+
+        new ResizeObserver(() => scheduleResize()).observe(terminalContainer);
+
+        setToolbarVisible(getInitialToolbarVisibility(), false);
+        syncViewport();
+    </script>
+</body>
+
+</html>
