@@ -13,8 +13,8 @@ database-path: sqlite3://data.db
 # 监听端口
 listen: 127.0.0.1:18888
 
-# 授权码，建议在配置文件中指定，也可以在命令中使用 -key 指定
-key: 你的授权码填这里   # your-license-key-here
+# 当前自改版无需授权码，请保持为空
+key:
 
 # 前端文件位置（建议不设置此项，而是由 nginx / caddy 等 Web 服务器提供前端文件）
 # html-path: ./public

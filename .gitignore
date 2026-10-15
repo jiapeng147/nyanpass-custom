@@ -1,8 +1,10 @@
 # 隐私数据，切勿提交
 config.yml
+.env
 caddy/Caddyfile
 data.db
 data.db-*
 caddy_data/
 *.log
+initial-admin.txt
 你的数据库.db

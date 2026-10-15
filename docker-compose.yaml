@@ -3,10 +3,28 @@ services:
     image: alpine
     network_mode: host
     restart: always
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
     volumes:
       - .:/opt/backend
     working_dir: /opt/backend
-    command: ./rel_backend
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if [ ! -f config.yml ]; then
+          cp config.yml.example config.yml
+        fi
+        chmod +x rel_backend
+        if [ ! -f data.db ]; then
+          echo "首次启动，正在初始化数据库..."
+          if ! MIGRATE=1 ADMIN="$${ADMIN_USERNAME}" ./rel_backend -c config.yml > initial-admin.txt 2>&1; then
+            cat initial-admin.txt
+            exit 1
+          fi
+          cat initial-admin.txt
+        fi
+        exec ./rel_backend -c config.yml
     logging:
       driver: "json-file"
       options:
@@ -16,10 +34,13 @@ services:
     image: caddy:2-alpine
     network_mode: host
     restart: always
+    environment:
+      DOMAIN: ${DOMAIN:-panel.example.com}
     volumes:
       - .:/opt/backend
       - ./caddy:/etc/caddy
       - ./caddy_data:/data
+    command: caddy run --config /etc/caddy/Caddyfile.example --adapter caddyfile
     logging:
       driver: "json-file"
       options:

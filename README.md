@@ -1,88 +1,117 @@
-# nyanpass backend（自改版 / custom build）
+# nyanpass backend（免授权自改版）
 
-nyanpass 后端面板的自定义修改版。本仓库**只含程序本体**，不含任何个人数据。
+nyanpass 后端面板的自定义构建。本仓库包含可直接部署的后端程序、前端文件、IP 数据库和 Docker Compose 配置，不包含任何用户数据。
 
-## 包含什么
+当前构建无需填写授权码。首次启动会自动初始化数据库，并创建管理员账户。
+
+## 文件说明
 
 | 文件 | 说明 |
 |------|------|
-| `rel_backend` | 后端主程序（已改动的二进制） |
-| `public/` | 前端文件（index.html / assets 等） |
+| `rel_backend` | Linux x86_64 后端程序 |
+| `public/` | 面板前端文件 |
 | `qqwry.dat` | IPv4 归属地库 |
 | `zxipv6wry.db` | IPv6 归属地库 |
-| `docker-compose.yaml` | 容器编排（nya 后端 + caddy 反代） |
-| `config.yml.example` | 配置模板（授权码已清空） |
-| `caddy/Caddyfile.example` | 反代模板（域名为占位符） |
+| `docker-compose.yaml` | 后端和 Caddy HTTPS 反向代理 |
+| `config.yml.example` | 后端配置模板 |
+| `.env.example` | 域名和管理员用户名模板 |
+| `caddy/Caddyfile.example` | Caddy 配置 |
 
-## 不包含什么（刻意移除的隐私数据）
+## 环境要求
 
-- `config.yml` 里的**授权码 key**
-- `caddy/Caddyfile` 里的**真实域名**
-- `data.db` 及其 WAL —— 所有**账号、节点、转发规则、流量数据**
-- `caddy_data/` —— **TLS 证书和私钥**
+- Linux x86_64 服务器
+- Docker 和 Docker Compose
+- 一个已解析到服务器公网 IP 的域名
+- 公网可以访问服务器的 TCP `80` 和 `443` 端口
 
-部署时这些会自动重新生成（证书）或由你手动填入（授权码、域名）。
-
----
-
-## 这东西怎么用（已部署的情况）
-
-程序跑起来后：
-
-1. caddy 把你的域名反代到后端 `127.0.0.1:18888`（见 `config.yml` 的 `listen`）。
-2. 浏览器打开你的域名即可访问面板，首次会让你创建管理员账号。
-3. 授权码写在 `config.yml` 的 `key:` 字段，**面板能否启动依赖它有效**（过期会导致容器 crash 重启）。
-4. 常用运维：
-   ```bash
-   cd /opt/backend
-   docker compose ps              # 查看状态
-   docker compose logs -f nya     # 看后端日志（排查启动失败）
-   docker compose restart nya     # 改完 config.yml 后重启生效
-   ```
-
----
-
-## 怎么从零搭建回来（全新服务器）
-
-> 前提：一台 Linux + 已装 Docker / docker compose，一个解析到本机公网 IP 的域名。
+## 一键部署
 
 ```bash
-# 1. 拉取本仓库到 /opt/backend
-git clone https://github.com/jiapeng147/nyanpass-custom.git /opt/backend
-cd /opt/backend
+git clone https://github.com/jiapeng147/nyanpass-custom.git /opt/nyanpass
+cd /opt/nyanpass
 
-# 2. 生成配置，填入你的授权码
-cp config.yml.example config.yml
-# 编辑 config.yml，把 key: 后面改成你的真实授权码
+cp .env.example .env
+sed -i 's/panel.example.com/你的域名/' .env
 
-# 3. 生成反代配置，填入你的域名
-cp caddy/Caddyfile.example caddy/Caddyfile
-# 编辑 caddy/Caddyfile，把 your-domain.example 改成你的域名
-#   your-domain.example {           ->   np.example.com {
-#       reverse_proxy 127.0.0.1:18888
-#   }
-
-# 4. 给二进制可执行权限（git 克隆后可能丢失）
-chmod +x rel_backend
-
-# 5. 启动
 docker compose up -d
-
-# 6. 查看状态 / 日志
-docker compose ps
-docker compose logs -f nya
+docker compose logs nya
 ```
 
-启动后 caddy 会自动向 Let's Encrypt 申请域名证书（需 80/443 端口可从公网访问），证书存入自动生成的 `caddy_data/`。
+首次启动时，后端会自动：
 
-浏览器打开 `https://你的域名` → 创建管理员 → 开始用。
+1. 从 `config.yml.example` 生成 `config.yml`。
+2. 初始化 `data.db`。
+3. 创建管理员账户。
+4. 将初始用户名和密码写入 `initial-admin.txt`。
 
-### 说明
+查看初始管理员信息：
 
-- `config.yml` 默认监听 `127.0.0.1:18888`，只给 caddy 反代用，不直接对外。
-- `caddy/Caddyfile` 里的后端地址：host 网络模式下用 `127.0.0.1:18888` 即可（示例里的 `172.30.242.2` 是旧的 docker 内网地址，按你的网络模式调整）。
-- 授权码过期续费后，改回 `config.yml` 的 `key:` 再 `docker compose restart nya`。
+```bash
+cd /opt/nyanpass
+cat initial-admin.txt
+```
 
-## 恢复带数据的备份
+然后打开：
 
-如果你另外保存了含 `data.db` 的全量备份，直接把 `data.db*` 覆盖进 `/opt/backend/` 再重启即可，账号/转发规则/流量全部恢复。
+```text
+https://你的域名
+```
+
+登录后请立即修改管理员密码。
+
+## 常用命令
+
+```bash
+cd /opt/nyanpass
+
+docker compose ps
+docker compose logs -f nya
+docker compose logs -f caddy
+docker compose restart nya
+git pull
+docker compose up -d
+```
+
+## 配置说明
+
+- 后端只监听 `127.0.0.1:18888`，不会直接暴露到公网。
+- Caddy 使用 host 网络访问后端，并自动申请和续期 HTTPS 证书。
+- 域名在 `.env` 的 `DOMAIN` 中配置。
+- 管理员用户名可通过 `.env` 的 `ADMIN_USERNAME` 修改，默认是 `admin`。
+- `config.yml` 的 `key` 保持为空，无需填写授权码。
+- 如果服务器的 `80/443` 已被 Nginx、Caddy、GoEdge 或其他程序占用，请不要启动 Compose 中的 `caddy` 服务，改用现有反向代理转发到 `127.0.0.1:18888`。
+
+仅启动后端：
+
+```bash
+docker compose up -d nya
+```
+
+现有反向代理的回源配置：
+
+```text
+协议：http
+地址：127.0.0.1
+端口：18888
+```
+
+## 恢复备份
+
+先停止服务，再将旧数据库复制到仓库目录：
+
+```bash
+cd /opt/nyanpass
+docker compose down
+cp /你的备份路径/data.db ./data.db
+cp /你的备份路径/data.db-wal ./data.db-wal 2>/dev/null || true
+cp /你的备份路径/data.db-shm ./data.db-shm 2>/dev/null || true
+docker compose up -d
+```
+
+恢复已有数据库时不会重新创建管理员。
+
+## 注意
+
+- `data.db*`、`config.yml`、`.env`、`initial-admin.txt` 和 `caddy_data/` 包含敏感信息，请勿提交到 Git。
+- 当前仓库提供的是已编译二进制，不包含后端源代码。
+- 0919 构建仍可能输出旧授权模块的联网或授权日志，但授权服务器不可用、授权码为空或授权过期均不会阻止面板启动和登录。
