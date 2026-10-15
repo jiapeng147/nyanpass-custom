@@ -142,3 +142,11 @@ docker compose up -d
 - `data.db*`、`config.yml`、`.env`、`initial-admin.txt` 和 `caddy_data/` 包含敏感信息，请勿提交到 Git。
 - 当前仓库提供的是已编译二进制，不包含后端源代码。
 - 0919 构建仍可能输出旧授权模块的联网或授权日志，但授权服务器不可用、授权码为空或授权过期均不会阻止面板启动和登录。
+
+## 如果最后不行 自己叫AI改吧！！
+nyanpass 0919
+
+| P1 | gate-bypass | 0x10E1B47 | 48 8b 84 24 78 01 00 00 → E9 FC FC FF FF | 闸门 403 路径 → jmp 0x10E1848（成功路径），恒放行，与 CTXMAP 无关 |
+| P2 | shutdown-ret | 0x1489B00 | 49 → C3 | 该函数 = {db.Close(); os.Exit(0)}，授权失败不再退出 |
+| P3 | expire-ok | 0x142D3D9 | 7E 7A → EB 7A | cmp now,expire; jle → 无条件跳成功，永不过期 |
+
