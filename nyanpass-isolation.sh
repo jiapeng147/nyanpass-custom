@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
-    echo "请使用 sudo bash $0 <check|start|status|restore> 运行，不要 source。" >&2
+if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]}" != "$0" ]]; then
+    echo "请直接执行脚本，不要 source。" >&2
     return 1
 fi
 
