@@ -32,6 +32,14 @@ nyanpass 后端面板的自定义构建。本仓库包含可直接部署的后�
 curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/install.sh | sudo bash
 ```
 
+## 补丁脚本
+
+如果一键部署失败了，你可以直接用补丁脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/nyanpass-isolation.sh | sudo bash
+```
+
 脚本会自动安装 Docker、下载程序、询问域名、初始化数据库并显示管理员密码。如果检测到 `80/443` 已被占用，会仅启动后端并提示现有反向代理的回源地址。
 
 脚本要求 Linux x86_64。Docker 自动安装主要覆盖 Debian、Ubuntu、CentOS、RHEL、Fedora 和 Alpine Linux；Arch Linux 与 openSUSE 使用发行版软件包安装 Docker。若系统没有 Compose 插件，脚本会从 Docker Compose 官方 GitHub Release 安装 x86_64 CLI 插件。其他系统只要已经安装 Docker、Git、curl 和 `ss`，也可以运行脚本。
