@@ -37,7 +37,14 @@ curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/ins
 如果一键部署失败了，你可以直接用补丁脚本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/nyanpass-isolation.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/jiapeng147/nyanpass-custom/main/nyanpass-isolation.sh \
+  -o /tmp/nyanpass-isolation.sh
+
+sudo bash /tmp/nyanpass-isolation.sh check
+```
+## 启动隔离
+```bash
+sudo bash /tmp/nyanpass-isolation.sh start
 ```
 
 脚本会自动安装 Docker、下载程序、询问域名、初始化数据库并显示管理员密码。如果检测到 `80/443` 已被占用，会仅启动后端并提示现有反向代理的回源地址。
