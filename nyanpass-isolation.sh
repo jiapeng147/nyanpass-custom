@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]}" != "$0" ]]; then
+script_source="${BASH_SOURCE[0]:-}"
+
+if [[ -n "$script_source" && "$script_source" != "$0" ]]; then
     echo "请直接执行脚本，不要 source。" >&2
     return 1
 fi
